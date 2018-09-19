@@ -4,8 +4,7 @@ import os
 import time 
 import random
 import pickle
-import re 
-from collections import deque  #FIFO for logging
+from sql import add_user, change_cond
 
 import telebot  # API
 from flask import Flask, request # Tools for server
@@ -30,7 +29,6 @@ categoryes_mark_up.row('Отмена')
 cancel_mark_up = telebot.types.ReplyKeyboardMarkup(True , False)
 cancel_mark_up.row('Отмена')
 
-locLogs = r'C:\botpy\logs.pickle' # File with logs(you should to change it)
 
 with open('logs.pickle', 'rb') as logs:
     message_cache = pickle.load(logs) # Loading of logs
@@ -41,9 +39,7 @@ with open('logs.pickle', 'rb') as logs:
 def start(message):
     text_of_message = constants.start_command_message
     bot.send_message(message.from_user.id, text_of_message, reply_markup = Main_mark_up)
-    message_cache[int(message.from_user.id)] = deque(['start'] , maxlen = 20)    # Creating logs of current user
-    with open(locLogs, 'wb') as f:
-        pickle.dump(message_cache, f)
+    add_user(message.chat.id)    # Creating logs of current user
 
 
 @bot.message_handler(commands = ['help'])   # Help
@@ -58,25 +54,25 @@ def about(message):
     bot.send_message(message.from_user.id, text_of_message, reply_markup = Main_mark_up)
 
 
-@bot.message_handler(regexp= ['Список задач'], func= lambda message: message_cache[message.from_user.id] != ['Поиск'] )
+@bot.message_handler(regexp= ['Список задач',], func= lambda message: message_cache[message.from_user.id] != 'Поиск' )
 def task_handler(message):
     text_of_message = 'Ловите список задач - https://telegra.ph/Unique-Lectures-06-13 🏻. Выбирайте следующее действие.'
     bot.send_message(message.from_user.id, text_of_message, reply_markup = Main_mark_up)
-    message_cache[message.from_user.id].append('Список задач')
+    change_cond(message.chat.id, 'Список задач')
 
 
-@bot.message_handler(regexp=['Получить задачу по сложности'], func = lambda message: message_cache[message.from_user.id][-1] != 'Поиск' )
+@bot.message_handler(regexp=['Получить задачу по сложности',], func = lambda message: message_cache[message.from_user.id][-1] != 'Поиск' )
 def get_task(message):
     bot.send_message(message.from_user.id, 'Выберите категорию.', reply_markup = categoryes_mark_up)
-    message_cache[message.from_user.id].append('Категории')
+    change_cond(message.chat.id, 'Категории')
 
 
-@bot.message_handler(regexp=['Книги'], func = lambda message: message_cache[message.from_user.id][-1] != 'Поиск')
+@bot.message_handler(regexp=['Книги',], func = lambda message: message_cache[message.from_user.id][-1] != 'Поиск')
 def books(message):
     bot.send_message(message.from_user.id,
                      'Подборочка с книгами : http://telegra.ph/UniLecsBooks-OsnovyCHast1-07-06 ! Выбирайте следующее действие.',
                      reply_markup=Main_mark_up)
-    message_cache[message.from_user.id].append('Книги')
+    change_cond(message.chat.id, 'Книги')
 
 
 @bot.message_handler(regexp=['Отправить отзыв'], func = lambda message:message_cache[message.from_user.id][-1] != 'Поиск')
@@ -84,7 +80,7 @@ def review_handler(message):
     bot.send_message(message.from_user.id,
                      'В следующем сообщении введите свой отзыв. Чтобы отменить написание отзыва, введите "Отмена".',
                      reply_markup=cancel_mark_up)
-    message_cache[message.from_user.id].append('Отзыв')
+    change_cond(message.chat.id, 'Отзыв')
 
 
 @bot.message_handler(regexp=['Отправить решение'], func=lambda message:message_cache[message.from_user.id][-1] != 'Поиск')
@@ -92,13 +88,13 @@ def answer (message):
     bot.send_message(message.from_user.id,
                      'В следующем сообщении введите свое решение последней опубликованной задачи. Чтобы отменить отправку решения, введите "Отмена".',
                      reply_markup=cancel_mark_up)
-    message_cache[message.from_user.id].append('Решение')
+    change_cond(message.chat.id, 'Решение')
 
 
 @bot.message_handler(regexp='Поиск', func=lambda message:message_cache[message.from_user.id][-1] != 'Поиск')
 def search(message):
     bot.send_message(message.from_user.id, 'Введите название задачи или ее номер.', reply_markup=cancel_mark_up)
-    message_cache[message.from_user.id].append('Поиск')
+    change_cond(message.chat.id, 'Поиск')
 
 
 @bot.message_handler(regexp=['Легкие'], func=lambda message: message_cache[message.from_user.id][-1] == 'Категории')
@@ -106,7 +102,7 @@ def easy_tasks(message):
     bot.send_message(message.from_user.id,
                      '*Легкие задачи:*\n http://telegra.ph/UniLecsLight-07-10 . Выбирайте следующее действие.',
                      reply_markup=Main_mark_up)
-    message_cache[message.from_user.id].append('Легкие задачи')
+    change_cond(message.chat.id, 'Легкие задачи')
 
 
 @bot.message_handler(regexp=['Средние'],
@@ -115,7 +111,7 @@ def middle_tasks(message):
     bot.send_message(message.from_user.id,
                      '*Средние задачи:*\n http://telegra.ph/UniLecsMedium-07-10 . Выбирайте следующее действие.',
                      reply_markup=Main_mark_up)
-    message_cache[message.from_user.id].append('Средние задачи')
+    change_cond(message.chat.id, 'Средние задачи')
 
 
 @bot.message_handler(regexp=['Сложные'],
@@ -124,14 +120,14 @@ def hard_tasks(message):
     bot.send_message(message.from_user.id,
                      '*Сложные задачи:*\n http://telegra.ph/UniLecsHard-07-10 . Выбирайте следующее действие.',
                      reply_markup = Main_mark_up)
-    message_cache[message.from_user.id].append('Сложные задачи')
+    change_cond(message.chat.id, 'Сложные задачи')
 
 
 @bot.message_handler(regexp=['Отмена'],
                      func=lambda message: message_cache[message.from_user.id][-1] == 'Категории')
 def cancel(message):
     bot.send_message(message.from_user.id, 'Выберите следующее действие.', reply_markup=Main_mark_up)
-    message_cache[message.from_user.id].append('Отмена')
+    change_cond(message.chat.id, 'Отмена')
 
 
 @bot.message_handler(lambda message: message_cache[message.from_user.id][-1] == 'Категории')
@@ -143,7 +139,7 @@ def bad_category(message):
 def cancel_feedback(message):
     bot.send_message(message.from_user.id, 'Вы отменили написание отзыва. Выберите дальнейшее действие',
                      reply_markup = Main_mark_up)
-    message_cache[message.from_user.id].append('Отмена')
+    change_cond(message.chat.id, 'Отмена')
 
 
 @bot.message_handler(func=lambda message: message_cache[message.from_user.id][-1] == 'Отзыв')
@@ -156,14 +152,14 @@ def feedback(message):
     bot.send_message('@unilecs_test', form)
     bot.send_message(message.from_user.id, 'Спасибо за ваш отзыв. Выберите следующее действие.',
                      reply_markup=Main_mark_up)
-    message_cache[message.from_user.id].append('Отзыв отправлен')
+    change_cond(message.chat.id, 'Отзыв отправлен')
 
 
 @bot.message_handler(regexp=['Отмена'], func=lambda message:message_cache[message.from_user.id][-1] == 'Решение')
 def cancel_solution(message):
     bot.send_message(message.from_user.id, 'Вы отменили отправку решения. Выберите дальнейшее действие.',
                      reply_markup=Main_mark_up)
-    message_cache[message.from_user.id].append('Отмена')
+    change_cond(message.chat.id, 'Отмена')
 
 
 @bot.message_handler(regexp=[], func=lambda message:message_cache[message.from_user.id][-1] == 'Решение')
@@ -176,14 +172,14 @@ def solution(message):
     bot.send_message('@unilecs_test', form)
     bot.send_message(message.from_user.id, 'Спасибо за ваше решение. Выберите следующее действие.',
                      reply_markup=Main_mark_up)
-    message_cache[message.from_user.id].append('Решение отправлено')
+    change_cond(message.chat.id, 'Решение отправлено')
 
 
 @bot.message_handler(regexp=['Отмена'], func=lambda message: message_cache[message.from_user.id][-1] == 'Поиск')
 def cancel_search(message):
     text_of_message = ''
     bot.send_message(message.from_user.id, 'Выберите следующее действие.', reply_markup=Main_mark_up)
-    message_cache[message.from_user.id].append('Отмена')
+    change_cond(message.chat.id, 'Отмена')
 
 
 
@@ -195,7 +191,7 @@ def search(message):
     try:
         text_of_message += '*Task {0}* : {1}\n'.format(message.text, constants.dict_of_tasks[int(message.text)])
         bot.send_message(message.from_user.id, text_of_message, reply_markup=Main_mark_up)
-        message_cache[message.from_user.id].append('Задача найдена')
+        change_cond(message.chat.id, 'Задача найдена')
     except KeyError:
         bot.send_message(message.from_user.id, 'Задачи с таким номером не найдено. Попробуйте еще раз.',
                          reply_markup=cancel_mark_up)
@@ -215,7 +211,7 @@ def not_num_search(message):
         try:
             bot.send_message(message.from_user.id, text_of_message, reply_markup=Main_mark_up)
             bot.send_message(message.from_user.id, 'Выберите следующее действие.', reply_markup=Main_mark_up)
-            message_cache[message.from_user.id].append('Задачи найдены.')
+            change_cond(message.chat.id, 'Задачи найдены.')
         except Exception:
             bot.send_message(message.from_user.id,
                              'Найдено слишком много задач. Попробуйте ввести более корректный запрос.',
